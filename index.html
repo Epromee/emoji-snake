@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Emoji Snake</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+
+        body {
+            background:#31373D
+        }
+
+        p {
+            font-size:30px; text-align: center
+        }
+
+        button {
+            color:#000000;
+            background-color:#FFFFFF20;
+            border: 2px solid #000000;
+            border-radius: 10px;
+            width: 250px;
+            height: 150px;
+            font-size: 2vw;
+        }
+
+        button:hover {
+            color:#FFFFFF;
+            background-color:#40404020;
+            border: 2px solid #A0A000;
+        }
+        
+    </style>
+  </head>
+  <body>
+    <div align="center">
+        <p id="field" ></p>
+        <button type="button" onclick="callBindLeft()"><<</button> 
+        <button type="button" onclick="callBindRight()">>></button>
+    </div>
+    <script>
+        "use strict"
+
+        // utils
+
+        function overlay(text, map) {
+            let newText = []
+            let y = 0;
+            let x = 0;
+            for (let i = 0; i < text.length; ++i) {
+                let ch = text[i];
+                if (text[i] == '\n') {
+                    newText.push('\n')
+                    x = 0;
+                    y++;
+                    continue;
+                }
+                if (map[[y, x]]) {
+                    newText.push(map[[y, x]])
+                }
+                else {
+                    newText.push(ch)
+                }
+                ++x;
+            }
+            return newText
+        }
+
+        const range = (start, end) => Array(end - start).fill().map((_, idx) => start + idx)
+
+        const cartesian = (list1, list2) => {
+            let cart = []            
+            for (let e1 in list1) {
+                for (let e2 in list2) {
+                    cart.push([list1[e1], list2[e2]])
+                }
+            }
+            return cart
+        }
+
+        const takeRandom = (list) => (list.length == 0) ? null : list[Math.floor(Math.random() * list.length)]
+        const doNothing = () => {}
+        const ENDL = ['\n']
+        const exhausted = (num) => (!num || num <= 0)
+
+        const screen = document.getElementById('field')
+
+        // game
+
+        const gameFieldWidth = 17
+        const gameFieldHeight = 10
+
+        const initHeadY = 5
+        const initHeadX = 3
+       
+        const foodItems = [].concat(
+            ['🐣'],
+            ['🍇', '🍉', '🍊', '🍋', '🍌', '🍍', '🥭', '🍎', '🍏'],
+            ['🍐', '🍑', '🍒', '🍓', '🫐', '🥝', '🍅', '🥥', '🥑', '🍆', '🥔', '🥕'],
+            ['🌽', '🌶️', '🫑', '🥒', '🥦', '🍞', '🥐', '🥨', '🥞', '🧀', '🍖'],
+            ['🍗', '🥩', '🥓', '🍔', '🍟', '🍕', '🌭', '🥪', '🌮', '🌯', '🫔'],
+            ['🥙', '🧆', '🥚', '🍲', '🥗', '🍿', '🍛', '🍜', '🍝', '🍠', '🥮', '🥟', '🥠'],
+            ['🥡', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭','🍯']
+        );
+
+        const iconTakeFood = () => [takeRandom(foodItems)];
+        const iconTakeMap = () => [takeRandom(['🌱', '🌾', '🌹', '🥀', '🌻', '🌷', '🌿', '☘️'])]
+        const iconTakeWall = () => [takeRandom(['🌵', '🌳', '🌲', '🌴'])]
+        const iconTakeRat = () => [takeRandom(['🐀', '🐇', '🐁', '🐹', '🐿️', '🦫', '🦔'])]
+        const iconTakeChick = () => [takeRandom(['🐥', '🐓', '🐤', '🐦', '🦆'])]
+        const iconTakeBeast = () => [takeRandom(['🐂', '🐖', '🐗', '🐏', '🐑'])]
+
+        const snakes = '🐍🐍🐍🐍🐍🇸🐍🇳🐍🇦🐍🇰🐍🇪🐍🐍🐍🐍🐍\n'
+        const gameOver = '🐍🇬🐍🇦🐍🇲🐍🇪🐍🐍🐍🇴🐍🇻🐍🇪🐍🇷🐍\n'
+
+        const randomLess = (threshold) => Math.random() < threshold
+        const headsOrTails = () => (randomLess(0.5) ? 1 : -1)
+        const mkRandomEnvironmentEntry = () => randomLess(0.95) ? ['⬛'] : iconTakeMap()
+
+        const mkLine = (charFun, length) => exhausted(length) ? [] : [].concat(charFun(), mkLine(charFun, length - 1))
+        const mkRows = (lineFun, length) => exhausted(length) ? [] : [].concat(lineFun(), ENDL, mkRows(lineFun, length - 1))
+        
+        const wallPattern = (gw) => () => [].concat(iconTakeWall(), mkLine(mkRandomEnvironmentEntry, gw), iconTakeWall())
+        const horizontal = [].concat(mkLine(() => iconTakeWall(), gameFieldWidth + 2), ENDL)
+        const fieldBack = (gw, gh) => [].concat(horizontal, mkRows(wallPattern(gw), gh), horizontal)
+        
+        const drawField = (shallReturn, screen, contents) => {
+            const extraLine = (shallReturn ? snakes : gameOver)
+            screen.innerText = extraLine + contents + extraLine
+        }
+
+        const drawFood = (food, snakeHead, writeOverlay) => {
+            food.forEach(entry => {
+                let [y, x, foodImage] = entry
+                if (tooClose(snakeHead, entry)) {
+                    writeOverlay('👄')(snakeHead[0], snakeHead[1])
+                }
+                writeOverlay(foodImage)(y, x)
+            })
+        }
+
+        const drawSnake = (snake, writeOverlay) => {
+            const writeSnakeHead = writeOverlay('🐲');
+            const writeSnakeBody = writeOverlay('💚');
+            snake.forEach(segment => writeSnakeBody(segment[0], segment[1]));
+            writeSnakeHead(snake[0][0], snake[0][1]);
+        }
+
+        // physics
+        
+        const doesHit = (hitbox) => {
+            let hitMap = {}
+            for (let entry in hitbox) {             
+                hitMap[[hitbox[entry][0], hitbox[entry][1]]] = true
+            }
+            return (t) => !!hitMap[[t[0], t[1]]]
+        }
+
+        const tooClose = (X, Y) => Math.abs(X[0] - Y[0]) + Math.abs(X[1] - Y[1]) <= 1
+
+        const hitsBorders = (gw, gh) => (obj) => obj[0] < 0 || obj[1] < 0 || obj[0] >= gh || obj[1] >= gw  
+        const hitsGameBorders = hitsBorders(gameFieldWidth, gameFieldHeight)  
+
+        // food types
+        function moveRat(pos, state) {
+            if (state.failed) state.dir = -state.dir
+            return [pos[0], pos[1] + state.dir]
+        }
+
+        const makeRat = (ptr) => [].concat(ptr, iconTakeRat(), { dir : headsOrTails() }, moveRat)
+        
+        function moveChick(pos, state) {
+            if (state.failed) state.dir = -state.dir
+            return [pos[0] + state.dir, pos[1]]
+        }
+        
+        const makeChick = (ptr) => [].concat(ptr, iconTakeChick(), { dir : headsOrTails() }, moveChick)
+
+        function moveBeast(pos, state) {
+            if (state.failed || randomLess(0.1)) {
+                let tmp = state.dirX              
+                let qual = headsOrTails()
+                state.dirX = state.dirY * qual
+                state.dirY = tmp * (-qual)
+            }
+            return [pos[0] + state.dirY, pos[1] + state.dirX]
+        }
+        
+        const makeBeast = (ptr) => [].concat(ptr, iconTakeBeast(), { dirX : 1, dirY : 0 }, moveBeast)
+        const makeFood = (ptr) => [].concat(ptr, iconTakeFood())
+
+        // routines        
+        const allocateSomeFood = (food, doesHitSnake, doesHitFood) => {
+            if (food.length == 0 || randomLess(0.3)) {
+                let bruteforceField = cartesian(range(0, gameFieldHeight), range(0, gameFieldWidth))
+                let freePoint = takeRandom(bruteforceField.filter((t) => !doesHitSnake(t) && !doesHitFood(t)))
+                if (freePoint) {
+                    if (randomLess(0.7)) food.push(makeFood(freePoint))
+                    else food.push(takeRandom([makeRat, makeChick, makeBeast])(freePoint))
+                }
+            }
+        }
+                
+        const moveFood = (food, doesHitSnake, doesHitFood, refreshFoodHitbox) => {
+            food.forEach(entry => {
+                let [y, x, foodImage, state, movement] = entry
+                let newPos = movement ? movement([y, x], state) : [y, x]
+                let failed = doesHitFood(newPos) || doesHitSnake(newPos) || hitsGameBorders(newPos)
+                if (!failed) {
+                    entry[0] = newPos[0]
+                    entry[1] = newPos[1]
+                    if (state) state.failed = false
+                }
+                else if (state) {   
+                    state.failed = true
+                }
+                refreshFoodHitbox()
+            })
+        }
+        
+        const checkIfEatenSomethingAndGrow = (shallReturn, food, snake, doesHitSnake, refreshSnakeHitbox) => {
+            let eatenSomething = false;            
+
+            food = food.filter((t) => {
+                if (!doesHitSnake(t)) return true;     
+                return !(eatenSomething = true);
+            })
+
+            if (!eatenSomething && shallReturn) {
+                snake.pop();
+                refreshSnakeHitbox()
+            }
+            
+            return food;
+        }
+                
+        const moveSnake = (snake, doesHitSnake, dirY, dirX) => {                
+            let newHead = [snake[0][0] + dirY, snake[0][1] + dirX]
+            let shallReturn = !(doesHitSnake(newHead) || hitsGameBorders(newHead))
+            if (shallReturn) snake = [newHead].concat(snake)
+            let head = snake[0]
+            return [head, snake, shallReturn]
+        }
+
+        // keyboard
+        const dirByCode = (code) => ({ 'ArrowUp' : [-1, 0], 'ArrowDown' : [1, 0], 'ArrowLeft' : [0, -1], 'ArrowRight' : [0, 1] })[code]
+
+        // global key events state
+        let boundKeyDown = null
+        const callBindKey = (code, isdown) => (boundKeyDown || doNothing)(code, isdown)
+
+        let boundLeft = null
+        const callBindLeft = () => (boundLeft || doNothing)()
+        let boundRight = null
+        const callBindRight = () => (boundRight || doNothing)()
+
+        const makeGame = () => {
+            
+            let background = fieldBack(gameFieldWidth, gameFieldHeight)
+            let food = []
+            let snake = [[initHeadY, initHeadX]]
+            
+            let [pendingY, pendingX] = [0, 1]
+            let [dirY, dirX] = [pendingY, pendingX]
+            let keyList = []
+            
+            boundKeyDown = (code, isdown) => {
+                keyList = keyList.filter((c) => c != code)
+                if (isdown) keyList.push(code)
+                let topCode = keyList[keyList.length - 1]
+                if (topCode) {
+                    let [ty, tx] = dirByCode(topCode) || [pendingY, pendingX];
+                    [pendingY, pendingX] = (ty == 0 && dirY == 0 || tx == 0 && dirX == 0) ? [pendingY, pendingX] : [ty, tx]
+                }
+            }
+
+            boundLeft = () => [pendingY, pendingX] = [-dirX, dirY]
+            boundRight = () => [pendingY, pendingX] = [dirX, -dirY]
+        
+            const gameLoop = (dt) => {
+
+                [dirY, dirX] = [pendingY, pendingX]
+                
+                let doesHitSnake
+                let doesHitFood
+                let overlayMap = {}
+
+                const refreshSnakeHitbox = () => doesHitSnake = doesHit(snake)
+                const refreshFoodHitbox = () => doesHitFood = doesHit(food)
+                const writeOverlay = (char) => (y, x) => overlayMap[[y + 1, x + 1]] = char
+                                
+                refreshSnakeHitbox()
+                
+                let [head, newSnake, shallReturn] = moveSnake(snake, doesHitSnake, dirY, dirX)
+                snake = newSnake
+                refreshSnakeHitbox()                
+                food = checkIfEatenSomethingAndGrow(shallReturn, food, snake, doesHitSnake, refreshSnakeHitbox)
+                refreshFoodHitbox()
+                moveFood(food, doesHitSnake, doesHitFood, refreshFoodHitbox)
+                allocateSomeFood(food, doesHitSnake, doesHitFood)
+                drawSnake(snake, writeOverlay)
+                drawFood(food, head, writeOverlay)
+                drawField(shallReturn, screen, overlay(background, overlayMap).join(''))
+
+                if (shallReturn) {
+                    setTimeout(gameLoop, 300)
+                }
+                else {
+                    boundKeyDown = null
+                    boundLeft = null
+                    boundRight = null
+                    setTimeout(makeGame, 2000)
+                }
+            }
+
+            gameLoop()
+
+        }
+
+        makeGame()
+
+        document.addEventListener('keydown', (e) => callBindKey(e.code, 1))
+        document.addEventListener('keyup', (e) => callBindKey(e.code, 0))
+        
+    </script>
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
