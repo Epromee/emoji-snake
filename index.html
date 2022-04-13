@@ -6,6 +6,9 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Emoji Snake</title>
     <link rel="stylesheet" href="style.css">
+
+    <script src="https://twemoji.maxcdn.com/v/latest/twemoji.min.js" crossorigin="anonymous"></script>
+
     <style>
 
         body {
@@ -30,6 +33,13 @@
             color:#FFFFFF;
             background-color:#40404020;
             border: 2px solid #A0A000;
+        }
+
+        img.emoji {
+           height: 1em;
+           width: 1em;
+           margin: 0 .05em 0 .1em;
+           vertical-align: -0.1em;
         }
         
     </style>
@@ -129,6 +139,7 @@
         const drawField = (shallReturn, screen, contents) => {
             const extraLine = (shallReturn ? snakes : gameOver)
             screen.innerText = extraLine + contents + extraLine
+            twemoji.parse(screen)
         }
 
         const drawFood = (food, snakeHead, writeOverlay) => {
